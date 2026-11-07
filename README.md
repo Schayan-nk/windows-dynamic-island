@@ -24,8 +24,12 @@ small pill, opens on hover (or Ctrl+Alt+T) and gives quick access to:
 Requires the .NET 9 SDK on Windows.
 
 ```powershell
-dotnet publish src/Island.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
+dotnet publish src/Island.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true `
+  -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o publish
 ```
+
+`IncludeNativeLibrariesForSelfExtract` matters: without it WPF's native DLLs (`*_cor3.dll`) are written next to
+`Island.exe`, and a copy of the exe alone crashes with `DllNotFoundException` the first time WPF hooks a window.
 
 ## Run
 
