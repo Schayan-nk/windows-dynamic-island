@@ -27,7 +27,8 @@ public partial class App : Application
         if (test >= 0 && test + 1 < e.Args.Length)
         {
             var log = e.Args[test + 1];
-            Task.Run(() => SelfTest.RunAsync(log)).ContinueWith(t => Dispatcher.Invoke(() => Shutdown(t.IsCompletedSuccessfully ? t.Result : 99)));
+            bool online = Array.IndexOf(e.Args, "--online") >= 0;
+            Task.Run(() => SelfTest.RunAsync(log, online)).ContinueWith(t => Dispatcher.Invoke(() => Shutdown(t.IsCompletedSuccessfully ? t.Result : 99)));
             return;
         }
 
@@ -51,12 +52,18 @@ public partial class App : Application
         AppDomain.CurrentDomain.UnhandledException += (_, a) => Settings.Log(a.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, a) => { Settings.Log(a.Exception); a.SetObserved(); };
 
+        Island.Startup.Repair();
         _win = new MainWindow();
         _win.Show();
 
         _tray = new System.Windows.Forms.NotifyIcon { Text = "Island", Visible = true, Icon = LoadIcon() };
         var menu = new System.Windows.Forms.ContextMenuStrip();
+        var autoStart = new System.Windows.Forms.ToolStripMenuItem("Start with Windows") { CheckOnClick = true };
+        autoStart.Click += (_, _) => Island.Startup.Set(autoStart.Checked);
+        menu.Opening += (_, _) => autoStart.Checked = Island.Startup.IsEnabled;
         menu.Items.Add("Open the island", null, (_, _) => _win.OpenFromTray());
+        menu.Items.Add(autoStart);
+        menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
         menu.Items.Add("Quit", null, (_, _) => Shutdown());
         _tray.ContextMenuStrip = menu;
         _tray.MouseClick += (_, a) =>

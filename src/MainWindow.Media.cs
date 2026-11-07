@@ -14,6 +14,7 @@ public partial class MainWindow
     void OnMedia(MediaInfo m)
     {
         _mi = m;
+        UpdateLyrics();
         RefreshMusicTile();
         if (_mode == Mode.Expanded && _tab == Tab.Music) RefreshMusic();
         UpdateHeader();
@@ -50,6 +51,7 @@ public partial class MainWindow
     void RefreshMusic()
     {
         MusicApp.Text = _mi.App.ToUpperInvariant();
+        RefreshLyricsUi();
         bool has = _mi.HasSession;
         MusicOpen.Visibility = Vis(!has);
         MusicPrev.IsEnabled = MusicNext.IsEnabled = MusicPlay.IsEnabled = has;
@@ -85,6 +87,7 @@ public partial class MainWindow
             MusicPos.Text = Fmt.Clock(pos);
             MusicDur.Text = Fmt.Clock(_mi.Duration);
         }
+        ScheduleLyric(true);
     }
 
     void MusicPlay_Click(object sender, RoutedEventArgs e)

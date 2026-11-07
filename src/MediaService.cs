@@ -15,6 +15,7 @@ public sealed class MediaInfo
     public bool Playing;
     public string Title = "";
     public string Artist = "";
+    public string Album = "";
     public string App = "";
     public ImageSource? Art;
     public TimeSpan Position;
@@ -115,6 +116,7 @@ public sealed class MediaService : IDisposable
                 var p = await s.TryGetMediaPropertiesAsync();
                 info.Title = p?.Title ?? "";
                 info.Artist = p?.Artist ?? "";
+                info.Album = p?.AlbumTitle ?? "";
                 var key = info.App + "|" + info.Title + "|" + info.Artist;
                 if (key != _artKey)
                 {

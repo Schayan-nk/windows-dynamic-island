@@ -136,7 +136,7 @@ public partial class MainWindow : Window
     void FitWindow(bool small)
     {
         if (ShotsMode) return;
-        double h = small ? 100 : 420;
+        double h = small ? 100 : Math.Max(420, ExpandedHeight + 56);
         if (Height != h) Height = h;
     }
 
@@ -192,15 +192,16 @@ public partial class MainWindow : Window
         DropContent.Visibility = m == Mode.Drop ? Visibility.Visible : Visibility.Collapsed;
         ProgressContent.Visibility = m == Mode.Progress ? Visibility.Visible : Visibility.Collapsed;
 
-        var g = m switch
+        (double W, double H, double R) g = m switch
         {
             Mode.Live => Live,
             Mode.Pop => Pop,
-            Mode.Expanded => Expanded,
+            Mode.Expanded => (Expanded.W, ExpandedHeight, Expanded.R),
             Mode.Drop => DropSize,
             Mode.Progress => ProgressSize,
             _ => Collapsed,
         };
+        if (m == Mode.Expanded && ExpandedContent.Height != g.H) ExpandedContent.Height = g.H;
         AnimateTo(g.W, g.H, g.R);
 
         UIElement content = m switch
@@ -334,6 +335,7 @@ public partial class MainWindow : Window
         Pill.CornerRadius = cr;
         GlowShape.CornerRadius = cr;
         Pill.Clip = new RectangleGeometry(new Rect(0, -r, w, h + r), r, r);
+        PlaceTabBar(h);
     }
 
     // ---------- hover, click, keyboard ----------

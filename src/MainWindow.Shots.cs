@@ -64,6 +64,14 @@ public partial class MainWindow
         await Shot(dir, "18-progress", () => { SetMode(Mode.Collapsed); OnPhoneProgress("beach.jpg", 0.2); }, 400);
         await Shot(dir, "19-progress-61", () => OnPhoneProgress("beach.jpg", 0.61), 500);
         await Shot(dir, "20-home-claude", () => { SelectTab(Tab.Home); SetMode(Mode.Expanded); }, 1300);
+        await Shot(dir, "21-music-lyrics", () =>
+        {
+            _mi = new MediaInfo { HasSession = true, Playing = true, Title = "Golden Hour", Artist = "Nova Lane", App = "Spotify", Art = art,
+                Duration = TimeSpan.FromSeconds(200), Position = TimeSpan.FromSeconds(24.5), PositionAt = DateTime.Now };
+            OnMedia(_mi);
+            SelectTab(Tab.Music);
+            ShowDemoLyrics();
+        }, 1300);
         Application.Current.Shutdown();
     }
 

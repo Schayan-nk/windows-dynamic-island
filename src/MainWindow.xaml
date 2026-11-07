@@ -331,6 +331,11 @@
 
                                 <!-- Music -->
                                 <Grid x:Name="MusicPanel" Visibility="Collapsed">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="200" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
@@ -366,8 +371,30 @@
                                             </Button>
                                             <Button x:Name="MusicNext" Style="{StaticResource IconBtn}" Content="&#xE893;" Width="42" Height="40" FontSize="18" Click="MusicNext_Click" />
                                             <Button x:Name="MusicOpen" Style="{StaticResource PillBtn}" Content="Open Spotify" Margin="16,0,0,0" VerticalAlignment="Center" Click="MusicOpen_Click" Visibility="Collapsed" />
+                                            <Button x:Name="LyricsBtn" Style="{StaticResource IconBtn}" Content="&#xE8E4;" Width="38" Height="34" FontSize="15" Margin="14,0,0,0" VerticalAlignment="Center"
+                                                    ToolTip="Lyrics" Click="LyricsBtn_Click" Visibility="Collapsed" />
+                                            <TextBlock x:Name="LyricsStatus" FontSize="12" Foreground="{StaticResource Dimmer}" Margin="8,0,0,0" VerticalAlignment="Center" />
                                         </StackPanel>
                                     </StackPanel>
+                                    </Grid>
+
+                                    <!-- Lyrics: the island grows by this band while it shows -->
+                                    <Grid x:Name="LyricsBox" Grid.Row="1" Height="94" VerticalAlignment="Top" ClipToBounds="True" Background="Transparent"
+                                          Visibility="Collapsed" MouseWheel="LyricsBox_MouseWheel">
+                                        <Grid.OpacityMask>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                <GradientStop Color="#00000000" Offset="0" />
+                                                <GradientStop Color="#FF000000" Offset="0.22" />
+                                                <GradientStop Color="#FF000000" Offset="0.78" />
+                                                <GradientStop Color="#00000000" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Grid.OpacityMask>
+                                        <StackPanel x:Name="LyricsStack" VerticalAlignment="Top" Margin="10,0">
+                                            <StackPanel.RenderTransform>
+                                                <TranslateTransform x:Name="LyricsShift" />
+                                            </StackPanel.RenderTransform>
+                                        </StackPanel>
+                                    </Grid>
                                 </Grid>
 
                                 <!-- Ask Claude -->
@@ -597,6 +624,9 @@
 
                             <!-- Tab bar -->
                             <Grid Grid.Row="2">
+                                <Grid.RenderTransform>
+                                    <TranslateTransform x:Name="TabBarShift" />
+                                </Grid.RenderTransform>
                                 <StackPanel x:Name="Tabs" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Button x:Name="TabHome" Style="{StaticResource TabBtn}" Tag="Home" Click="Tab_Click" ToolTip="Home">
                                         <StackPanel Orientation="Horizontal">

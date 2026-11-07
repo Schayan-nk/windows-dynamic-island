@@ -74,6 +74,7 @@ public partial class MainWindow
 
         _claude.Updated += u => Dispatcher.InvokeAsync(() => OnClaude(u));
         _claude.Start();
+        InitLyrics();
         _media.Changed += m => Dispatcher.InvokeAsync(() => OnMedia(m));
         if (!ShotsMode) _ = _media.StartAsync();
 
@@ -388,6 +389,7 @@ public partial class MainWindow
         TrayPanel.Visibility = Vis(t == Tab.Tray);
         ClipPanel.Visibility = Vis(t == Tab.Clip);
         NotesPanel.Visibility = Vis(t == Tab.Notes);
+        SyncExpandedSize();
         var dim = Paint.Brush(0x8C, 255, 255, 255);
         foreach (var (k, s) in _tabs)
         {
@@ -524,6 +526,7 @@ public partial class MainWindow
         m.Items.Add(Check("Open when the pointer touches it", _settings.HoverToOpen, v => _settings.HoverToOpen = v));
         m.Items.Add(Check("Hide when an app is full screen", _settings.HideInFullscreen, v => _settings.HideInFullscreen = v));
         m.Items.Add(Check("Persian calendar", _settings.PersianDate, v => { _settings.PersianDate = v; UpdateHeaderClock(); }));
+        m.Items.Add(Check("Lyrics in the Music tab", _settings.Lyrics, SetLyricsOn));
         m.Items.Add(Check("Start with Windows", Startup.IsEnabled, Startup.Set));
         m.Items.Add(new Separator());
         m.Items.Add(new MenuItem { Header = "Open or close:  Ctrl+Alt+T", IsEnabled = false });

@@ -9,10 +9,13 @@ using System.Threading.Tasks;
 
 namespace Island;
 
-/// <summary>Island.exe --selftest LOG: checks the phone server (loopback only) and the transcript reader.</summary>
+/// <summary>
+/// Island.exe --selftest LOG [--online]: checks the phone server (loopback only), the transcript reader,
+/// lyrics parsing and the start-with-Windows entry. --online also asks LRCLIB for a song.
+/// </summary>
 internal static class SelfTest
 {
-    public static async Task<int> RunAsync(string logPath)
+    public static async Task<int> RunAsync(string logPath, bool online = false)
     {
         var log = new StringBuilder();
         int fails = 0;
@@ -26,6 +29,15 @@ internal static class SelfTest
         catch (Exception ex) { Check(false, "phone tests threw: " + ex); }
         try { ClaudeTests(Check); }
         catch (Exception ex) { Check(false, "claude tests threw: " + ex); }
+        try { LyricsTests(Check); }
+        catch (Exception ex) { Check(false, "lyrics tests threw: " + ex); }
+        try { StartupTests(Check); }
+        catch (Exception ex) { Check(false, "startup tests threw: " + ex); }
+        if (online)
+        {
+            try { await LyricsOnline(Check, log); }
+            catch (Exception ex) { Check(false, "online lyrics test threw: " + ex.Message); }
+        }
 
         log.AppendLine(fails == 0 ? "ALL PASSED" : $"{fails} FAILED");
         File.WriteAllText(logPath, log.ToString());
@@ -160,5 +172,64 @@ internal static class SelfTest
         check(last?.Primary?.Working == false, "an interrupt stops the turn");
         w.Dispose();
         try { Directory.Delete(root, true); } catch { }
+    }
+
+    // Made-up lines only: the tests never need a real song.
+    static void LyricsTests(Action<bool, string> check)
+    {
+        var lines = Lrc.Parse("[ar:Nobody]\n[offset:+500]\n[00:01.00]first line\n[00:03.50][00:10.00]again and again\n[00:05.25]<00:05.25>word <00:05.80>timed\n[00:07]\n");
+        check(lines.Count == 5, "LRC: one line per time stamp, tags skipped");
+        check(lines.Count == 5 && lines[0].At == TimeSpan.FromSeconds(0.5) && lines[0].Text == "first line", "LRC: [offset] moves the words sooner");
+        check(lines.Count == 5 && lines[2].Text == "word timed", "LRC: word time stamps are removed");
+        check(lines.Count == 5 && lines[3].Text == "" && lines[4].Text == "again and again" && lines[4].At == TimeSpan.FromSeconds(9.5), "LRC: repeats and pauses keep their times, in order");
+        check(Lrc.IndexAt(lines, TimeSpan.FromSeconds(0.2)) == -1 && Lrc.IndexAt(lines, TimeSpan.FromSeconds(3.2)) == 1 && Lrc.IndexAt(lines, TimeSpan.FromMinutes(5)) == 4,
+            "LRC: the line being sung at a given time");
+
+        var list = System.Text.Json.JsonDocument.Parse("""
+            [
+              {"trackName":"Paper Boats","artistName":"Nova Lane","duration":231,"instrumental":false,"plainLyrics":"x","syncedLyrics":"[00:01.00]x"},
+              {"trackName":"Paper Boats","artistName":"Nova Lane","duration":200,"instrumental":false,"plainLyrics":"y","syncedLyrics":null},
+              {"trackName":"Paper Boats (Live)","artistName":"Nova Lane","duration":201,"instrumental":false,"plainLyrics":"z","syncedLyrics":"[00:01.00]z"},
+              {"trackName":"Other Song","artistName":"Nova Lane","duration":200,"instrumental":false,"plainLyrics":"w","syncedLyrics":"[00:01.00]w"}
+            ]
+            """).RootElement;
+        var pick = LyricsService.Pick(list, "Nova Lane", "Paper Boats", TimeSpan.FromSeconds(200));
+        check(pick?.GetProperty("syncedLyrics").GetString() == "[00:01.00]z", "lyrics search keeps the synced record of the same length and title");
+        check(LyricsService.Pick(list, "Nova Lane", "Paper Boats", TimeSpan.FromSeconds(320)) == null, "a record of another length is not used");
+        check(LyricsService.CleanTitle("Paper Boats - Remastered 2011") == "Paper Boats" && LyricsService.CleanTitle("Paper Boats (feat. Someone)") == "Paper Boats"
+            && LyricsService.CleanTitle("Paper Boats [Official Video]") == "Paper Boats", "titles lose remaster, feat. and video tags");
+        var fa = LyricsService.Build("[00:01.00]این یک خط نمونه است\n[00:02.00]و این خط دوم است", null, false);
+        check(fa is { Synced: true, Rtl: true } && fa.Lines.Count == 2, "Persian lyrics read right to left");
+        var plain = LyricsService.Build(null, "\n\nline one\n\nline two\n\n", false);
+        check(plain is { Synced: false } && plain.Lines.Count == 3, "plain lyrics keep verse gaps, not the blank edges");
+        check(LyricsService.Build(null, null, true)?.Instrumental == true && LyricsService.Build("", "", false) == null, "instrumental and empty records");
+    }
+
+    // Uses its own value name, so the user's real "Start with Windows" choice is never touched.
+    static void StartupTests(Action<bool, string> check)
+    {
+        const string name = "Island-selftest";
+        try
+        {
+            Startup.SetFor(name, true);
+            check(Startup.IsEnabledFor(name), "start with Windows: on");
+            using (var a = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run"))
+                a.SetValue(name, new byte[] { 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, Microsoft.Win32.RegistryValueKind.Binary);
+            check(!Startup.IsEnabledFor(name), "start with Windows: off when Task Manager disabled it");
+            Startup.SetFor(name, true);
+            check(Startup.IsEnabledFor(name), "start with Windows: turning it on again clears the Task Manager switch");
+            Startup.SetFor(name, false);
+            check(!Startup.IsEnabledFor(name), "start with Windows: off");
+        }
+        finally { Startup.SetFor(name, false); }
+    }
+
+    // Reports only what was found, never the words.
+    static async Task LyricsOnline(Action<bool, string> check, StringBuilder log)
+    {
+        var svc = new LyricsService();
+        var l = await svc.GetAsync("", "Amazing Grace", "", TimeSpan.Zero, default);
+        log.AppendLine($"INFO  LRCLIB: {(l == null ? "nothing" : l.Instrumental ? "instrumental" : $"{l.Lines.Count} lines, synced={l.Synced}")}");
+        check(l is { Lines.Count: > 0 }, "LRCLIB answers a search (a public-domain hymn)");
     }
 }

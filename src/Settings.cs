@@ -13,6 +13,7 @@ public sealed class Settings
     public bool HoverToOpen { get; set; } = true;
     public bool HideInFullscreen { get; set; } = true;
     public bool PersianDate { get; set; }
+    public bool Lyrics { get; set; } = true;
     public int FocusMinutes { get; set; } = 25;
     public string? LastFolder { get; set; }
     public List<string> Tray { get; set; } = new();
@@ -54,29 +55,72 @@ public sealed class Settings
     }
 }
 
+/// <summary>"Start with Windows": the per-user Run entry, nothing that needs an administrator.</summary>
 internal static class Startup
 {
     const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    const string Name = "Island";
+    // Task Manager and Settings > Apps > Startup record "Disabled" here, and Windows then skips the Run entry.
+    const string ApprovedKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run";
+    public const string Name = "Island";
 
-    public static bool IsEnabled
+    public static bool IsEnabled => IsEnabledFor(Name);
+    public static void Set(bool on) => SetFor(Name, on);
+
+    /// <summary>On only when Windows will really start this copy: the entry points here and was not turned off in Task Manager.</summary>
+    internal static bool IsEnabledFor(string name)
     {
-        get
+        try
         {
-            try { using var k = Registry.CurrentUser.OpenSubKey(RunKey); return k?.GetValue(Name) is string; }
-            catch { return false; }
+            using var k = Registry.CurrentUser.OpenSubKey(RunKey);
+            if (k?.GetValue(name) is not string cmd || !PointsHere(cmd)) return false;
+            using var a = Registry.CurrentUser.OpenSubKey(ApprovedKey);
+            return a?.GetValue(name) is not byte[] b || b.Length == 0 || (b[0] & 1) == 0;
         }
+        catch { return false; }
     }
 
-    public static void Set(bool on)
+    internal static void SetFor(string name, bool on)
     {
         try
         {
             using var k = Registry.CurrentUser.CreateSubKey(RunKey);
-            if (on) k.SetValue(Name, $"\"{Environment.ProcessPath}\"");
-            else k.DeleteValue(Name, false);
+            if (on)
+            {
+                k.SetValue(name, $"\"{Environment.ProcessPath}\"");
+                // Clears a "Disabled" left by Task Manager; otherwise Windows would still skip the entry.
+                using var a = Registry.CurrentUser.CreateSubKey(ApprovedKey);
+                a.SetValue(name, new byte[] { 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, RegistryValueKind.Binary);
+            }
+            else
+            {
+                k.DeleteValue(name, false);
+                using var a = Registry.CurrentUser.OpenSubKey(ApprovedKey, true);
+                a?.DeleteValue(name, false);
+            }
         }
         catch (Exception ex) { Settings.Log(ex); }
+    }
+
+    /// <summary>After Island.exe was moved, points an existing entry at the new place. A turned-off entry stays off.</summary>
+    public static void Repair()
+    {
+        try
+        {
+            using var k = Registry.CurrentUser.OpenSubKey(RunKey, true);
+            if (k?.GetValue(Name) is string cmd && !PointsHere(cmd)) k.SetValue(Name, $"\"{Environment.ProcessPath}\"");
+        }
+        catch (Exception ex) { Settings.Log(ex); }
+    }
+
+    static bool PointsHere(string cmd)
+    {
+        var p = cmd.Trim();
+        if (p.StartsWith('"'))
+        {
+            int end = p.IndexOf('"', 1);
+            p = end > 0 ? p[1..end] : p.Trim('"');
+        }
+        return string.Equals(p, Environment.ProcessPath, StringComparison.OrdinalIgnoreCase);
     }
 }
 
